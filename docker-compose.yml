@@ -1,0 +1,82 @@
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: recifood_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-recifood}
+      POSTGRES_USER: ${DB_USER:-recifood_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-recifood_secret_2026}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-recifood_user} -d ${DB_NAME:-recifood}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - recifood_network
+
+  # Backend Python (FastAPI, yt-dlp, AI Providers, Scraper)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: recifood_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-recifood_user}:${DB_PASSWORD:-recifood_secret_2026}@postgres:5432/${DB_NAME:-recifood}
+      APP_ENV: ${APP_ENV:-development}
+      COOKIES_FILE_PATH: /data/cookies/cookies.txt
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend/app:/app/app
+      - cookies_data:/data/cookies
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - recifood_network
+
+  # Frontend PHP / HTML / JS / Apache
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: recifood_frontend
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-recifood}
+      DB_USER: ${DB_USER:-recifood_user}
+      DB_PASSWORD: ${DB_PASSWORD:-recifood_secret_2026}
+      BACKEND_API_URL: http://backend:8000
+      COOKIES_FILE_PATH: /data/cookies/cookies.txt
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    volumes:
+      - ./frontend/src:/var/www/html
+      - cookies_data:/data/cookies
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - recifood_network
+
+volumes:
+  postgres_data:
+    driver: local
+  cookies_data:
+    driver: local
+
+networks:
+  recifood_network:
+    driver: bridge

@@ -1,0 +1,49 @@
+/* Custom Style Recifood */
+
+@media print {
+    header, footer, .no-print, nav, button, .action-buttons {
+        display: none !important;
+    }
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    .print-only {
+        display: block !important;
+    }
+    .recipe-container {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+}
+
+/* Checkbox pour les étapes de recette */
+.step-checkbox:checked + div {
+    opacity: 0.55;
+    text-decoration: line-through;
+}
+
+.ingredient-checkbox:checked + span {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+/* Animations légères */
+.card-hover {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.12);
+}
+
+/* Custom badges */
+.badge-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
