@@ -1,12 +1,18 @@
 # Recifood 🍳 &mdash; Gestionnaire de Recettes (Standard Schema.org)
 
+**Recifood est un projet personnel en vibe coding (car j'avais la flemme, je code déjà assez au taff), car les solutions qui existent, ne me convenaient pas, mais l'inspiration vient clairement de [https://github.com/mealie-recipes/mealie/] et [https://github.com/GerardPolloRebozado/social-to-mealie]**
+
 Recifood est une application web complète de gestion de recettes culinaires, conforme au standard international **[schema.org/Recipe](https://schema.org/Recipe)**.
+
+
+**Forkez le, c'est gratuit et fonctionnel** (à part avec les recettes vraiment obscure, où même nous, humain, on a dû mal à savoir les quantités/ingrédient)
 
 ---
 
 ## 🏗️ Architecture & Technologies
 
 - **Frontend** : PHP 8.2 (Apache), HTML5, JavaScript moderne, CSS (Tailwind CSS CDN + FontAwesome 6).
+- **PWA** : Manifest + Service Worker (installable sur mobile/desktop, Web Share Target pour importer une recette directement depuis le menu « Partager » d'une autre application).
 - **Backend API** : Python 3.11 (FastAPI, Uvicorn, Pydantic, BeautifulSoup4, yt-dlp, OpenAI).
 - **Base de données** : PostgreSQL 16 (avec support natif JSONB pour les fiches Schema.org JSON-LD).
 - **Conteneurisation** : Docker & Docker Compose.
@@ -43,7 +49,7 @@ docker-compose up -d --build
 
 Aucun compte n'est créé par défaut. **Le tout premier compte inscrit sur le serveur devient automatiquement l'administrateur** (droits étendus : modification/suppression de n'importe quelle recette). Rendez-vous sur la page d'inscription pour créer ce premier compte.
 
-Des recettes d'exemples complètes au standard Schema.org sont injectées par défaut et sont publiques (visibles par tous, y compris sans compte).
+La base de données démarre entièrement vide, sans aucune recette d'exemple : à vous d'importer ou de créer vos premières recettes une fois connecté.
 
 ---
 
@@ -55,17 +61,18 @@ Des recettes d'exemples complètes au standard Schema.org sont injectées par d�
    - Les recettes sont publiques par défaut (consultables sans compte) ; la création, l'import, les paramètres, les favoris et le statut « déjà cuisiné » nécessitent un compte.
 
 2. **Tableau de bord des recettes (`/pages/dashboard.php`)** :
-   - Affichage sous forme de cartes élégantes avec images, temps de cuisson, portions et notes.
+   - Affichage sous forme de cartes élégantes, entièrement cliquables (image et contenu), avec images, temps de cuisson et portions.
    - Recherche en direct par mot-clé, titre ou ingrédient.
    - Filtres par catégorie (Plat principal, Dessert, etc.) et cuisine (Française, Italienne, etc.).
-   - Filtres « Favoris » et « J'ai déjà cuisiné » (statut propre à chaque utilisateur, avec bascule interactive en AJAX).
+   - Filtres « Favoris » et « J'ai déjà cuisiné » (statut propre à chaque utilisateur, avec bascule interactive en AJAX, accessible aussi bien depuis le tableau de bord que depuis la fiche recette).
 
 3. **Vue détaillée de recette (`/pages/recipe-detail.php`)** :
    - Rendu fidèle et dynamique conforme au standard **schema.org/Recipe**.
    - Balise `<script type="application/ld+json">` injectée pour l'interopérabilité et le SEO.
+   - Image affichée en entier (sans recadrage/zoom agressif).
+   - Nombre de portions ajustable (+/-) avec **recalcul automatique des quantités** de chaque ingrédient.
    - Liste des ingrédients avec cases à cocher pour préparation/courses.
    - Étapes de préparation interactives (cases à cocher de progression).
-   - Informations nutritionnelles (`NutritionInformation` : calories, protéines, lipides, glucides).
    - Actions rapides : Favoris, « J'ai déjà cuisiné », Imprimer, Télécharger le JSON-LD, Partager un lien public, Modifier (propriétaire ou administrateur), Supprimer (propriétaire ou administrateur).
    - Inspecteur JSON-LD Schema.org intégré.
 
@@ -86,6 +93,22 @@ Des recettes d'exemples complètes au standard Schema.org sont injectées par d�
    - Configuration de **yt-dlp** (cookies au format Netscape `cookies.txt`, collés directement et enregistrés côté serveur sans jamais afficher leur contenu sensible ensuite ; options audio/vidéo).
    - Configuration de **3 providers IA indépendants** (Texte, Vision, Transcription) : chacun avec sa propre URL d'API compatible OpenAI, sa clé et son modèle, au libre choix de l'utilisateur (aucun fournisseur imposé).
    - Test de connexion IA en direct.
+
+---
+
+## 📱 Application Web Progressive (PWA)
+
+Recifood est installable comme une application native sur mobile et desktop (manifest + service worker), et intègre le **Web Share Target** : une fois l'application installée, elle apparaît directement dans le menu **« Partager »** du téléphone.
+
+**Exemple d'utilisation** : depuis Instagram (ou YouTube, TikTok, Chrome...), appuyez sur *Partager* → sélectionnez **Recifood** → si vous êtes connecté, l'analyse et l'import de la recette démarrent automatiquement (avec la cascade Schema.org → vidéo → post réseau social) ; sinon, l'application vous demande de vous connecter puis reprend l'import là où il s'était arrêté.
+
+### Installation
+- **Android (Chrome)** : menu ⋮ → « Installer l'application » (ou bannière automatique proposée par le navigateur).
+- **iOS (Safari)** : bouton Partager → « Sur l'écran d'accueil » (le Web Share Target n'est pas supporté par iOS/Safari, l'import manuel via la page « Importer » reste toujours disponible).
+- **Desktop (Chrome/Edge)** : icône d'installation dans la barre d'adresse.
+
+### ⚠️ Prérequis important : HTTPS
+Le Web Share Target (et l'installation de la PWA en général) **nécessite HTTPS** — seul `http://localhost` est toléré par les navigateurs pour du développement local. Pour tester sur un vrai téléphone, le site Docker (servi en HTTP simple par défaut) doit être exposé derrière un reverse proxy TLS de votre choix (ex. Caddy, Traefik, Nginx + Let's Encrypt, ou un tunnel type Cloudflare Tunnel/ngrok pour les tests).
 
 ---
 

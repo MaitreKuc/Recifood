@@ -10,6 +10,17 @@ $page_title = $page_title ?? 'Recifood - Gestionnaire de Recettes';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($page_title) ?></title>
+
+    <!-- PWA : Manifest, icônes & couleur de thème -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#f97316">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Recifood">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -50,5 +61,16 @@ $page_title = $page_title ?? 'Recifood - Gestionnaire de Recettes';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Custom Style -->
     <link rel="stylesheet" href="/assets/css/style.css">
+
+    <!-- Enregistrement du Service Worker (PWA installable + Web Share Target) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch((err) => {
+                    console.warn('Enregistrement du Service Worker impossible :', err);
+                });
+            });
+        }
+    </script>
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased bg-slate-50">

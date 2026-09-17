@@ -12,6 +12,12 @@ $user_id = getCurrentUserId();
 $message = '';
 $error = '';
 
+// Web Share Target (PWA) : une URL a été partagée depuis une autre application (ex. Instagram)
+// et redirigée ici pour être pré-remplie / importée automatiquement.
+$shared_url = trim($_GET['shared_url'] ?? '');
+$autorun = !empty($_GET['autorun']) && !empty($shared_url);
+$share_error = !empty($_GET['share_error']);
+
 $page_title = "Importer une Recette - Recifood";
 require_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/navbar.php';
@@ -26,6 +32,20 @@ require_once __DIR__ . '/../includes/navbar.php';
             Convertissez et enregistrez n'importe quelle recette au standard officiel <a href="https://schema.org/Recipe" target="_blank" class="text-brand-600 font-semibold underline">schema.org/Recipe</a>.
         </p>
     </div>
+
+    <?php if ($share_error): ?>
+        <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-3">
+            <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+            <div>Aucun lien n'a été trouvé dans le contenu partagé. Collez l'adresse manuellement ci-dessous.</div>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($shared_url): ?>
+        <div class="mb-6 p-4 rounded-xl bg-brand-50 border border-brand-200 text-brand-800 text-sm flex items-start gap-3">
+            <i class="fa-solid fa-share-nodes mt-0.5"></i>
+            <div>Lien reçu via le partage : <strong class="break-all"><?= htmlspecialchars($shared_url) ?></strong> — importation automatique en cours...</div>
+        </div>
+    <?php endif; ?>
 
     <!-- Onglets de modes d'importation -->
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
@@ -73,6 +93,7 @@ require_once __DIR__ . '/../includes/navbar.php';
                             <i class="fa-solid fa-link text-sm"></i>
                         </div>
                         <input type="url" id="import-site-input" required
+                               value="<?= htmlspecialchars($shared_url) ?>"
                                placeholder="https://www.marmiton.org/... ou https://www.youtube.com/... ou https://www.instagram.com/p/..."
                                class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
                     </div>
@@ -438,6 +459,16 @@ async function saveExtractedRecipe() {
         btn.innerHTML = '<i class="fa-solid fa-bookmark"></i> Confirmer et Ajouter';
     }
 }
+
+// Web Share Target (PWA) : si une URL a été partagée depuis une autre application
+// avec importation automatique demandée, on déclenche directement le formulaire "Site Web".
+<?php if ($autorun): ?>
+document.addEventListener('DOMContentLoaded', () => {
+    switchTab('site');
+    const form = document.getElementById('form-site');
+    if (form) form.requestSubmit();
+});
+<?php endif; ?>
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

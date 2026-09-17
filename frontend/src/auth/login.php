@@ -5,8 +5,14 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth_check.php';
 
+// Lien de retour (ex. depuis le partage PWA) : uniquement un chemin local relatif, jamais une URL externe.
+$redirect = $_GET['redirect'] ?? $_POST['redirect'] ?? '';
+if (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || str_starts_with($redirect, '//')) {
+    $redirect = '/pages/dashboard.php';
+}
+
 if (isLoggedIn()) {
-    header('Location: /pages/dashboard.php');
+    header('Location: ' . $redirect);
     exit;
 }
 
@@ -42,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['email'] = $user['email'];
                 $_SESSION['is_admin'] = (bool)$user['is_admin'];
 
-                header('Location: /pages/dashboard.php');
+                header('Location: ' . $redirect);
                 exit;
             } else {
                 $error = "Identifiants invalides (nom d'utilisateur/email ou mot de passe incorrect).";
@@ -88,6 +94,7 @@ require_once __DIR__ . '/../includes/navbar.php';
 
             <!-- Formulaire de Connexion -->
             <form action="/auth/login.php" method="POST" class="space-y-5">
+                <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirect) ?>">
                 <div>
                     <label for="username_or_email" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                         Nom d'utilisateur ou Email
