@@ -79,30 +79,16 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insertion d'un utilisateur de démonstration par défaut : admin / admin123
--- Hash bcrypt PHP pour 'admin123'. Premier compte créé -> administrateur du serveur.
-INSERT INTO users (id, username, email, password_hash, is_admin)
-VALUES (
-    1,
-    'admin',
-    'admin@recifood.local',
-    '$2y$10$mlvflEdy1GIMra2bBegGeelZC3t2hiRwo540VG0.vC30zFI89Fn72',
-    TRUE
-) ON CONFLICT (id) DO NOTHING;
+-- Aucun compte n'est créé par défaut : le tout premier compte inscrit sur le serveur
+-- devient automatiquement administrateur (voir la logique dans frontend/src/auth/register.php).
 
--- Configuration par défaut pour l'utilisateur admin
-INSERT INTO user_settings (user_id, ytdlp_path)
-VALUES (1, 'yt-dlp')
-ON CONFLICT (user_id) DO NOTHING;
-
--- Resynchronisation de la séquence d'auto-incrément après insertion d'un ID explicite
-SELECT setval('users_id_seq', (SELECT COALESCE(MAX(id), 1) FROM users));
-
--- Insertion de recettes d'exemples strictement conformes à schema.org/Recipe
+-- Insertion de recettes d'exemples strictement conformes à schema.org/Recipe.
+-- Elles n'appartiennent à aucun utilisateur (user_id = NULL) puisqu'aucun compte n'existe encore
+-- à l'initialisation ; elles restent publiques et visibles par tous comme n'importe quelle recette.
 INSERT INTO recipes (user_id, name, description, image_url, prep_time, cook_time, total_time, recipe_yield, recipe_category, recipe_cuisine, is_favorite, schema_data)
 VALUES
 (
-    1,
+    NULL,
     'Tarte Tatin aux Pommes Caramélisées',
     'La véritable tarte Tatin traditionnelle, avec ses pommes fondantes généreusement caramélisées au beurre salé et sa pâte feuilletée croustillante.',
     'https://images.unsplash.com/photo-1568571780765-9276ac8b75a2?auto=format&fit=crop&w=800&q=80',
@@ -188,7 +174,7 @@ VALUES
     }'::jsonb
 ),
 (
-    1,
+    NULL,
     'Risotto crémeux aux Champignons des Bois et Parmesan',
     'Un risotto italien onctueux préparé avec du riz Carnaroli, des cèpes et girolles, du vin blanc sec et généreusement monté au beurre et Parmigiano Reggiano.',
     'https://images.unsplash.com/photo-1633964913295-ceb43826e7c9?auto=format&fit=crop&w=800&q=80',
@@ -279,7 +265,7 @@ VALUES
     }'::jsonb
 ),
 (
-    1,
+    NULL,
     'Pad Thaï Traditionnel aux Crevettes',
     'Le grand classique de la street food thaïlandaise : nouilles de riz sautées, crevettes, tofu, cacahuètes concassées, germes de soja et une sauce aigre-douce au tamarin.',
     'https://images.unsplash.com/photo-1559314809-0d155014e29e?auto=format&fit=crop&w=800&q=80',
@@ -374,8 +360,6 @@ VALUES
 -- Resynchronisation de la séquence des recettes par précaution
 SELECT setval('recipes_id_seq', (SELECT COALESCE(MAX(id), 1) FROM recipes));
 
--- Reprise du statut favori/déjà cuisiné hérité des recettes de démonstration vers le créateur
-INSERT INTO user_recipe_status (user_id, recipe_id, is_favorite, already_cooked)
-SELECT user_id, id, is_favorite, already_cooked FROM recipes
-WHERE is_favorite = TRUE OR already_cooked = TRUE
-ON CONFLICT (user_id, recipe_id) DO NOTHING;
+-- Remarque : contrairement aux versions précédentes, aucune ligne n'est insérée dans
+-- user_recipe_status pour les recettes de démonstration : elles n'appartiennent à aucun
+-- utilisateur (user_id = NULL) tant qu'aucun compte n'a été créé sur le serveur.

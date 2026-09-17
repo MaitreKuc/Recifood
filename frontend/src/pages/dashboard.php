@@ -111,9 +111,7 @@ require_once __DIR__ . '/../includes/navbar.php';
                 <span>&bull;</span>
                 <span><i class="fa-solid fa-utensils text-emerald-500"></i> <?= (int)$stats['cooked'] ?> déjà cuisinée<?= $stats['cooked'] > 1 ? 's' : '' ?></span>
                 <span>&bull;</span>
-                <span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                    <i class="fa-solid fa-code mr-1"></i> schema.org/Recipe
-                </span>
+                
             </p>
         </div>
 
@@ -230,13 +228,11 @@ require_once __DIR__ . '/../includes/navbar.php';
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <?php foreach ($recipes as $recipe): 
                 $schema = json_decode($recipe['schema_data'], true) ?: [];
-                $rating = $schema['aggregateRating']['ratingValue'] ?? null;
-                $review_count = $schema['aggregateRating']['reviewCount'] ?? null;
                 $ingredients_count = is_array($schema['recipeIngredient'] ?? null) ? count($schema['recipeIngredient']) : 0;
                 // Favori / déjà cuisiné : statut personnel, accessible à tout utilisateur connecté (peu importe le créateur)
                 $can_toggle = isLoggedIn();
             ?>
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col card-hover relative group">
+                <a href="/pages/recipe-detail.php?id=<?= (int)$recipe['id'] ?>" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col card-hover relative group cursor-pointer">
                     <!-- Image et Badges -->
                     <div class="relative h-48 sm:h-52 bg-slate-100 overflow-hidden">
                         <?php if (!empty($recipe['image_url'])): ?>
@@ -296,22 +292,9 @@ require_once __DIR__ . '/../includes/navbar.php';
                     <!-- Contenu de la carte -->
                     <div class="p-5 flex-1 flex flex-col justify-between">
                         <div>
-                            <!-- Rating si présent -->
-                            <?php if ($rating): ?>
-                                <div class="flex items-center space-x-1 text-amber-500 text-xs mb-1.5 font-medium">
-                                    <i class="fa-solid fa-star text-[11px]"></i>
-                                    <span class="text-slate-700 font-semibold"><?= htmlspecialchars((string)$rating) ?></span>
-                                    <?php if ($review_count): ?>
-                                        <span class="text-slate-400">(<?= htmlspecialchars((string)$review_count) ?>)</span>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endif; ?>
-
                             <!-- Titre -->
                             <h2 class="text-lg font-bold text-slate-900 group-hover:text-brand-600 transition line-clamp-1 font-['Plus_Jakarta_Sans']">
-                                <a href="/pages/recipe-detail.php?id=<?= (int)$recipe['id'] ?>">
-                                    <?= htmlspecialchars($recipe['name']) ?>
-                                </a>
+                                <?= htmlspecialchars($recipe['name']) ?>
                             </h2>
 
                             <!-- Description -->
@@ -335,12 +318,12 @@ require_once __DIR__ . '/../includes/navbar.php';
                                 <?php endif; ?>
                             </div>
 
-                            <a href="/pages/recipe-detail.php?id=<?= (int)$recipe['id'] ?>" class="text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-1">
+                            <span class="text-brand-600 group-hover:text-brand-700 font-semibold flex items-center gap-1">
                                 Voir <i class="fa-solid fa-arrow-right text-[10px]"></i>
-                            </a>
+                            </span>
                         </div>
                     </div>
-                </div>
+                </a>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>

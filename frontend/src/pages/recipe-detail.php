@@ -54,9 +54,15 @@ $keywords_list = is_array($keywords) ? $keywords : array_filter(array_map('trim'
 
 $ingredients = $schema['recipeIngredient'] ?? [];
 $instructions = $schema['recipeInstructions'] ?? [];
-$nutrition = $schema['nutrition'] ?? null;
-$rating = $schema['aggregateRating'] ?? null;
 $video = $schema['video'] ?? null;
+
+// Extraction du nombre de portions pour permettre le recalcul dynamique des quantités d'ingrédients
+$yield_number = null;
+$yield_suffix = '';
+if (!empty($recipe['recipe_yield']) && preg_match('/(\d+)/', (string)$recipe['recipe_yield'], $ym)) {
+    $yield_number = (int)$ym[1];
+    $yield_suffix = trim(str_replace($ym[1], '', (string)$recipe['recipe_yield']));
+}
 
 $page_title = htmlspecialchars($recipe['name']) . " - Recifood";
 require_once __DIR__ . '/../includes/header.php';
@@ -166,25 +172,15 @@ require_once __DIR__ . '/../includes/header.php';
                     <i class="fa-regular fa-calendar text-slate-400"></i>
                     <?= htmlspecialchars((string)$date_published) ?>
                 </span>
-                <?php if ($rating && !empty($rating['ratingValue'])): ?>
-                    <span>&bull;</span>
-                    <span class="flex items-center gap-1 text-amber-500 font-bold">
-                        <i class="fa-solid fa-star"></i>
-                        <?= htmlspecialchars((string)$rating['ratingValue']) ?> / 5
-                        <?php if (!empty($rating['reviewCount'])): ?>
-                            <span class="text-slate-400 font-normal">(<?= htmlspecialchars((string)$rating['reviewCount']) ?> avis)</span>
-                        <?php endif; ?>
-                    </span>
-                <?php endif; ?>
             </div>
         </div>
 
         <!-- Grande Image Hero de la recette -->
         <?php if (!empty($recipe['image_url'])): ?>
-            <div class="rounded-2xl overflow-hidden max-h-[440px] shadow-sm border border-slate-100">
+            <div class="rounded-2xl overflow-hidden max-h-[440px] shadow-sm border border-slate-100 bg-slate-100 flex items-center justify-center">
                 <img src="<?= htmlspecialchars($recipe['image_url']) ?>" 
                      alt="<?= htmlspecialchars($recipe['name']) ?>" 
-                     class="w-full h-full object-cover">
+                     class="w-full max-h-[440px] object-contain">
             </div>
         <?php endif; ?>
 
@@ -213,10 +209,27 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="p-2 border-t sm:border-t-0 border-l border-slate-200/60">
                 <span class="block text-xs uppercase font-semibold text-slate-400 tracking-wider">Portions</span>
-                <span class="text-lg sm:text-xl font-bold text-slate-800 flex items-center justify-center gap-1.5 mt-1">
-                    <i class="fa-solid fa-users text-slate-500 text-sm"></i>
-                    <?= htmlspecialchars($recipe['recipe_yield'] ?: 'N/C') ?>
-                </span>
+                <?php if ($yield_number): ?>
+                    <div class="flex items-center justify-center gap-2 mt-1">
+                        <button type="button" onclick="adjustServings(-1)" title="Diminuer les portions"
+                                class="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition shrink-0">
+                            <i class="fa-solid fa-minus text-xs"></i>
+                        </button>
+                        <span class="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-users text-slate-500 text-sm"></i>
+                            <span id="servings-value"><?= $yield_number ?></span><?= $yield_suffix ? ' ' . htmlspecialchars($yield_suffix) : '' ?>
+                        </span>
+                        <button type="button" onclick="adjustServings(1)" title="Augmenter les portions"
+                                class="w-7 h-7 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition shrink-0">
+                            <i class="fa-solid fa-plus text-xs"></i>
+                        </button>
+                    </div>
+                <?php else: ?>
+                    <span class="text-lg sm:text-xl font-bold text-slate-800 flex items-center justify-center gap-1.5 mt-1">
+                        <i class="fa-solid fa-users text-slate-500 text-sm"></i>
+                        <?= htmlspecialchars($recipe['recipe_yield'] ?: 'N/C') ?>
+                    </span>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -238,54 +251,21 @@ require_once __DIR__ . '/../includes/header.php';
                     <?php if (empty($ingredients)): ?>
                         <p class="text-sm text-slate-500 italic">Aucun ingrédient listé.</p>
                     <?php else: ?>
-                        <ul class="space-y-3">
-                            <?php foreach ($ingredients as $idx => $ing): ?>
-                                <li class="flex items-start gap-3 text-sm text-slate-700">
+                        <ul class="space-y-3" id="ingredients-list">
+                            <?php foreach ($ingredients as $idx => $ing):
+                                $ing_text = is_array($ing) ? ($ing['name'] ?? json_encode($ing)) : (string)$ing;
+                            ?>
+                                <li class="flex items-start gap-3 text-sm text-slate-700" data-original="<?= htmlspecialchars($ing_text) ?>">
                                     <input type="checkbox" id="ing-<?= $idx ?>" 
                                            class="ingredient-checkbox mt-1 rounded border-slate-300 text-brand-500 focus:ring-brand-400 cursor-pointer w-4 h-4">
                                     <label for="ing-<?= $idx ?>" class="cursor-pointer select-none leading-snug">
-                                        <span><?= htmlspecialchars(is_array($ing) ? ($ing['name'] ?? json_encode($ing)) : $ing) ?></span>
+                                        <span id="ing-text-<?= $idx ?>"><?= htmlspecialchars($ing_text) ?></span>
                                     </label>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
                     <?php endif; ?>
                 </div>
-
-                <!-- Informations Nutritionnelles (Schema.org/NutritionInformation) -->
-                <?php if ($nutrition && is_array($nutrition)): ?>
-                    <div class="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-xs">
-                        <h3 class="font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                            <i class="fa-solid fa-heart-pulse text-red-500"></i> Valeurs Nutritionnelles
-                        </h3>
-                        <div class="grid grid-cols-2 gap-2 text-slate-600">
-                            <?php if (!empty($nutrition['calories'])): ?>
-                                <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
-                                    <span class="text-slate-400 block">Calories</span>
-                                    <span class="font-bold text-slate-800 text-sm"><?= htmlspecialchars((string)$nutrition['calories']) ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($nutrition['proteinContent'])): ?>
-                                <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
-                                    <span class="text-slate-400 block">Protéines</span>
-                                    <span class="font-bold text-slate-800 text-sm"><?= htmlspecialchars((string)$nutrition['proteinContent']) ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($nutrition['carbohydrateContent'])): ?>
-                                <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
-                                    <span class="text-slate-400 block">Glucides</span>
-                                    <span class="font-bold text-slate-800 text-sm"><?= htmlspecialchars((string)$nutrition['carbohydrateContent']) ?></span>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($nutrition['fatContent'])): ?>
-                                <div class="bg-white p-2.5 rounded-xl border border-slate-100 shadow-2xs">
-                                    <span class="text-slate-400 block">Lipides</span>
-                                    <span class="font-bold text-slate-800 text-sm"><?= htmlspecialchars((string)$nutrition['fatContent']) ?></span>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
 
                 <!-- Mots-clés / Tags -->
                 <?php if (!empty($keywords_list)): ?>
@@ -465,6 +445,56 @@ async function shareRecipe(btn) {
     } catch (e) {
         alert("Lien de la recette : " + url);
     }
+}
+
+// --- Recalcul dynamique des quantités d'ingrédients selon le nombre de portions ---
+const originalServings = <?= json_encode($yield_number ?: 0) ?>;
+let currentServings = originalServings;
+
+function formatQuantity(num) {
+    if (!isFinite(num)) return '';
+    const rounded = Math.round(num * 100) / 100;
+    if (Number.isInteger(rounded)) return String(rounded);
+    return String(rounded).replace('.', ',');
+}
+
+function recalcIngredientText(original, factor) {
+    // Cherche une quantité en tête de chaîne : "250", "1,5", "1/2", "2 1/2" ...
+    const match = original.match(/^(\d+(?:[.,]\d+)?)(\s+(\d+(?:[.,]\d+)?)\/(\d+(?:[.,]\d+)?)|\/(\d+(?:[.,]\d+)?))?/);
+    if (!match) return original;
+
+    let value = parseFloat(match[1].replace(',', '.'));
+    if (match[3] && match[4]) {
+        // Nombre mixte, ex "2 1/2"
+        value += parseFloat(match[3].replace(',', '.')) / parseFloat(match[4].replace(',', '.'));
+    } else if (match[5]) {
+        // Simple fraction, ex "1/2"
+        value = value / parseFloat(match[5].replace(',', '.'));
+    }
+
+    const newValue = value * factor;
+    const formatted = formatQuantity(newValue);
+    if (formatted === '') return original;
+    return formatted + original.slice(match[0].length);
+}
+
+function applyServings(newServings) {
+    if (newServings < 1) newServings = 1;
+    currentServings = newServings;
+
+    const display = document.getElementById('servings-value');
+    if (display) display.textContent = newServings;
+
+    const factor = originalServings > 0 ? (newServings / originalServings) : 1;
+    document.querySelectorAll('#ingredients-list [data-original]').forEach((li) => {
+        const original = li.getAttribute('data-original');
+        const span = li.querySelector('span[id^="ing-text-"]');
+        if (span) span.textContent = recalcIngredientText(original, factor);
+    });
+}
+
+function adjustServings(delta) {
+    applyServings(currentServings + delta);
 }
 </script>
 

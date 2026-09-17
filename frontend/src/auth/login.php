@@ -99,7 +99,7 @@ require_once __DIR__ . '/../includes/navbar.php';
                         <input type="text" id="username_or_email" name="username_or_email" required autofocus
                             value="<?= htmlspecialchars($_POST['username_or_email'] ?? '') ?>"
                             class="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
-                            placeholder="admin ou admin@recifood.local">
+                            placeholder="votre_nom ou vous@exemple.com">
                     </div>
                 </div>
 
@@ -126,16 +126,6 @@ require_once __DIR__ . '/../includes/navbar.php';
                 </button>
             </form>
 
-            <!-- Démo Box -->
-            <div class="mt-6 p-3 bg-amber-50/70 border border-amber-200/60 rounded-xl text-xs text-amber-800 flex items-center justify-between">
-                <div>
-                    <span class="font-bold">Compte Démo :</span> <code>admin</code> / <code>admin123</code>
-                </div>
-                <button type="button" onclick="fillDemo()" class="text-xs text-brand-600 hover:text-brand-800 font-semibold underline">
-                    Remplir
-                </button>
-            </div>
-
             <!-- Footer Card -->
             <div class="mt-8 pt-6 border-t border-slate-100 text-center text-sm text-slate-500">
                 Vous n'avez pas de compte ?
@@ -146,12 +136,5 @@ require_once __DIR__ . '/../includes/navbar.php';
         </div>
     </div>
 </main>
-
-<script>
-function fillDemo() {
-    document.getElementById('username_or_email').value = 'admin';
-    document.getElementById('password').value = 'admin123';
-}
-</script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
