@@ -90,6 +90,7 @@ La base de données démarre entièrement vide, sans aucune recette d'exemple : 
    - Génère une recette originale au format Schema.org à partir d'une simple description libre, via le provider IA Texte configuré.
 
 7. **Page de paramètres (`/pages/settings.php`)** :
+   - **Gestion du compte** : modification du nom d'utilisateur et changement de mot de passe (avec vérification du mot de passe actuel).
    - Configuration de **yt-dlp** (cookies au format Netscape `cookies.txt`, collés directement et enregistrés côté serveur sans jamais afficher leur contenu sensible ensuite ; options audio/vidéo).
    - Configuration de **3 providers IA indépendants** (Texte, Vision, Transcription) : chacun avec sa propre URL d'API compatible OpenAI, sa clé et son modèle, au libre choix de l'utilisateur (aucun fournisseur imposé).
    - Test de connexion IA en direct.

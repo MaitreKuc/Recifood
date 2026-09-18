@@ -1,6 +1,6 @@
 <?php
 /**
- * Page des Paramètres (Configuration yt-dlp, Providers IA)
+ * Page des Paramètres (Compte, Configuration yt-dlp, Providers IA)
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth_check.php';
@@ -10,11 +10,59 @@ requireAuth();
 $user_id = getCurrentUserId();
 $success = '';
 $error = '';
+$account_success = '';
+$account_error = '';
 
 try {
     $db = getDB();
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Formulaire "Compte" : changement de pseudo et/ou de mot de passe (formulaires distincts,
+    // identifiés par le champ caché "form_action" pour ne pas interférer avec les paramètres IA/yt-dlp).
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === 'update_username') {
+        $new_username = trim($_POST['new_username'] ?? '');
+
+        if (strlen($new_username) < 3 || strlen($new_username) > 50) {
+            $account_error = "Le nom d'utilisateur doit comporter entre 3 et 50 caractères.";
+        } else {
+            $stmt = $db->prepare("SELECT id FROM users WHERE LOWER(username) = LOWER(:u) AND id != :uid");
+            $stmt->execute([':u' => $new_username, ':uid' => $user_id]);
+            if ($stmt->fetch()) {
+                $account_error = "Ce nom d'utilisateur est déjà utilisé.";
+            } else {
+                $stmt = $db->prepare("UPDATE users SET username = :u WHERE id = :uid");
+                $stmt->execute([':u' => $new_username, ':uid' => $user_id]);
+                $_SESSION['username'] = $new_username;
+                $account_success = "Votre nom d'utilisateur a été mis à jour avec succès.";
+            }
+        }
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? '') === 'update_password') {
+        $current_password = $_POST['current_password'] ?? '';
+        $new_password = $_POST['new_password'] ?? '';
+        $new_password_confirm = $_POST['new_password_confirm'] ?? '';
+
+        $stmt = $db->prepare("SELECT password_hash FROM users WHERE id = :uid");
+        $stmt->execute([':uid' => $user_id]);
+        $current_hash = $stmt->fetchColumn();
+
+        if (empty($current_password) || empty($new_password)) {
+            $account_error = "Veuillez renseigner votre mot de passe actuel et le nouveau mot de passe.";
+        } elseif (!$current_hash || !password_verify($current_password, $current_hash)) {
+            $account_error = "Le mot de passe actuel est incorrect.";
+        } elseif (strlen($new_password) < 6) {
+            $account_error = "Le nouveau mot de passe doit comporter au moins 6 caractères.";
+        } elseif ($new_password !== $new_password_confirm) {
+            $account_error = "Les deux mots de passe ne correspondent pas.";
+        } else {
+            $new_hash = password_hash($new_password, PASSWORD_BCRYPT);
+            $stmt = $db->prepare("UPDATE users SET password_hash = :p WHERE id = :uid");
+            $stmt->execute([':p' => $new_hash, ':uid' => $user_id]);
+            $account_success = "Votre mot de passe a été mis à jour avec succès.";
+        }
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form_action'] ?? 'save_settings') === 'save_settings') {
         $ytdlp_path = trim($_POST['ytdlp_path'] ?? 'yt-dlp');
         $ytdlp_download_video = isset($_POST['ytdlp_download_video']) ? 1 : 0;
         $ytdlp_audio_only = isset($_POST['ytdlp_audio_only']) ? 1 : 0;
@@ -93,6 +141,11 @@ try {
         'ai_vision_api_url' => '', 'ai_vision_api_key' => '', 'ai_vision_model' => '',
         'ai_transcription_api_url' => '', 'ai_transcription_api_key' => '', 'ai_transcription_model' => '',
     ];
+
+    // Chargement des informations du compte (pseudo / email actuels)
+    $stmt = $db->prepare("SELECT username, email FROM users WHERE id = :uid");
+    $stmt->execute([':uid' => $user_id]);
+    $account = $stmt->fetch() ?: ['username' => getCurrentUsername(), 'email' => ''];
 
 } catch (Exception $e) {
     $error = "Erreur : " . $e->getMessage();
@@ -199,7 +252,84 @@ function render_ai_block(string $key, string $title, string $subtitle, string $i
         </div>
     <?php endif; ?>
 
+    <?php if (!empty($account_success)): ?>
+        <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm flex items-start space-x-3">
+            <i class="fa-solid fa-circle-check mt-0.5 text-emerald-500"></i>
+            <div><?= htmlspecialchars($account_success) ?></div>
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($account_error)): ?>
+        <div class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start space-x-3">
+            <i class="fa-solid fa-triangle-exclamation mt-0.5 text-red-500"></i>
+            <div><?= htmlspecialchars($account_error) ?></div>
+        </div>
+    <?php endif; ?>
+
+    <!-- SECTION 0 : COMPTE (Pseudo & Mot de passe) -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6 mb-8">
+        <div class="flex items-center space-x-3 pb-4 border-b border-slate-100">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-700 to-slate-900 flex items-center justify-center text-white shadow-sm">
+                <i class="fa-solid fa-user-gear text-lg"></i>
+            </div>
+            <div>
+                <h2 class="text-lg font-bold text-slate-900">Mon Compte</h2>
+                <p class="text-xs text-slate-500">Modifiez votre nom d'utilisateur et votre mot de passe</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Changement de pseudo -->
+            <form method="POST" action="/pages/settings.php" class="space-y-3">
+                <input type="hidden" name="form_action" value="update_username">
+                <label for="new_username" class="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Nom d'utilisateur
+                </label>
+                <input type="text" id="new_username" name="new_username" required minlength="3" maxlength="50"
+                       value="<?= htmlspecialchars($account['username']) ?>"
+                       class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
+                <button type="submit"
+                        class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl transition flex items-center gap-2">
+                    <i class="fa-solid fa-pen"></i> Mettre à jour le pseudo
+                </button>
+            </form>
+
+            <!-- Changement de mot de passe -->
+            <form method="POST" action="/pages/settings.php" class="space-y-3">
+                <input type="hidden" name="form_action" value="update_password">
+                <div>
+                    <label for="current_password" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Mot de passe actuel
+                    </label>
+                    <input type="password" id="current_password" name="current_password" required
+                           class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="new_password" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Nouveau
+                        </label>
+                        <input type="password" id="new_password" name="new_password" required minlength="6"
+                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
+                    </div>
+                    <div>
+                        <label for="new_password_confirm" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Confirmer
+                        </label>
+                        <input type="password" id="new_password_confirm" name="new_password_confirm" required minlength="6"
+                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
+                    </div>
+                </div>
+                <button type="submit"
+                        class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl transition flex items-center gap-2">
+                    <i class="fa-solid fa-key"></i> Mettre à jour le mot de passe
+                </button>
+            </form>
+        </div>
+    </div>
+
     <form method="POST" action="/pages/settings.php" class="space-y-8">
+        <input type="hidden" name="form_action" value="save_settings">
 
         <!-- SECTION 1 : IA TEXTE -->
         <?php render_ai_block(
