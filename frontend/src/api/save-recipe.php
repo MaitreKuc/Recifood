@@ -25,6 +25,13 @@ if (!$recipe || empty($recipe['name'])) {
 $recipe['@context'] = $recipe['@context'] ?? 'https://schema.org';
 $recipe['@type'] = 'Recipe';
 
+// L'auteur de la recette est toujours l'utilisateur connecté qui effectue l'import/la création,
+// jamais l'auteur détecté par l'IA ou extrait de la source (site web, post de réseau social...).
+$recipe['author'] = [
+    '@type' => 'Person',
+    'name' => getCurrentUsername()
+];
+
 $name = $recipe['name'];
 $description = $recipe['description'] ?? '';
 $image_url = is_array($recipe['image'] ?? null) ? ($recipe['image'][0] ?? '') : ($recipe['image'] ?? '');

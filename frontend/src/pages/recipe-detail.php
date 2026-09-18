@@ -48,6 +48,13 @@ $can_delete = isLoggedIn() && ((int)$recipe['user_id'] === (int)$user_id || isAd
 // Extraction des données Schema.org
 $author_name = $schema['author']['name'] ?? ($schema['author'] ?? 'Chef Recifood');
 if (is_array($author_name)) $author_name = $author_name['name'] ?? 'Chef';
+
+// Les temps de préparation/cuisson/total ne sont affichés que s'ils sont réellement renseignés
+// (ne jamais inventer une durée absente de la source).
+$has_prep_time = !empty($recipe['prep_time']);
+$has_cook_time = !empty($recipe['cook_time']);
+$has_total_time = !empty($recipe['total_time']);
+$show_time_bar = $has_prep_time || $has_cook_time || $has_total_time;
 $date_published = $schema['datePublished'] ?? date('Y-m-d', strtotime($recipe['created_at']));
 $keywords = $schema['keywords'] ?? '';
 $keywords_list = is_array($keywords) ? $keywords : array_filter(array_map('trim', explode(',', $keywords)));
@@ -185,29 +192,43 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
 
         <!-- Métriques Clés de cuisson (Barre d'informations) -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-200/80 text-center">
-            <div class="p-2">
+        <?php
+            // Nombre de cases affichées : Portions est toujours présent, les temps uniquement s'ils sont connus.
+            $time_cells_count = ($has_prep_time ? 1 : 0) + ($has_cook_time ? 1 : 0) + ($has_total_time ? 1 : 0);
+            $total_cells = $time_cells_count + 1;
+            $sm_cols_class = $total_cells >= 4 ? 'sm:grid-cols-4' : ($total_cells === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2');
+            $cell_idx = 0;
+        ?>
+        <div class="grid grid-cols-2 <?= $sm_cols_class ?> gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-200/80 text-center">
+            <?php if ($has_prep_time): $cell_idx++; ?>
+            <div class="p-2 <?= $cell_idx > 1 ? 'border-t sm:border-t-0 sm:border-l border-slate-200/60' : '' ?>">
                 <span class="block text-xs uppercase font-semibold text-slate-400 tracking-wider">Préparation</span>
                 <span class="text-lg sm:text-xl font-bold text-slate-800 flex items-center justify-center gap-1.5 mt-1">
                     <i class="fa-regular fa-clock text-brand-500 text-sm"></i>
                     <?= htmlspecialchars(formatIsoDuration($recipe['prep_time'])) ?>
                 </span>
             </div>
-            <div class="p-2 border-l border-slate-200/60">
+            <?php endif; ?>
+            <?php if ($has_cook_time): $cell_idx++; ?>
+            <div class="p-2 <?= $cell_idx > 1 ? 'border-t sm:border-t-0 sm:border-l border-slate-200/60' : '' ?>">
                 <span class="block text-xs uppercase font-semibold text-slate-400 tracking-wider">Cuisson</span>
                 <span class="text-lg sm:text-xl font-bold text-slate-800 flex items-center justify-center gap-1.5 mt-1">
                     <i class="fa-solid fa-fire-burner text-amber-500 text-sm"></i>
                     <?= htmlspecialchars(formatIsoDuration($recipe['cook_time'])) ?>
                 </span>
             </div>
-            <div class="p-2 border-t sm:border-t-0 sm:border-l border-slate-200/60">
+            <?php endif; ?>
+            <?php if ($has_total_time): $cell_idx++; ?>
+            <div class="p-2 <?= $cell_idx > 1 ? 'border-t sm:border-t-0 sm:border-l border-slate-200/60' : '' ?>">
                 <span class="block text-xs uppercase font-semibold text-slate-400 tracking-wider">Temps Total</span>
                 <span class="text-lg sm:text-xl font-bold text-slate-800 flex items-center justify-center gap-1.5 mt-1">
                     <i class="fa-solid fa-hourglass-half text-brand-600 text-sm"></i>
-                    <?= htmlspecialchars(formatIsoDuration($recipe['total_time'] ?: $recipe['prep_time'])) ?>
+                    <?= htmlspecialchars(formatIsoDuration($recipe['total_time'])) ?>
                 </span>
             </div>
-            <div class="p-2 border-t sm:border-t-0 border-l border-slate-200/60">
+            <?php endif; ?>
+            <?php $cell_idx++; ?>
+            <div class="p-2 <?= $cell_idx > 1 ? 'border-t sm:border-t-0 border-l border-slate-200/60' : '' ?>">
                 <span class="block text-xs uppercase font-semibold text-slate-400 tracking-wider">Portions</span>
                 <?php if ($yield_number): ?>
                     <div class="flex items-center justify-center gap-2 mt-1">
@@ -278,6 +299,18 @@ require_once __DIR__ . '/../includes/header.php';
                                 </span>
                             <?php endforeach; ?>
                         </div>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Recette d'origine -->
+                <?php if (!empty($recipe['source_url'])): ?>
+                    <div class="pt-2">
+                        <span class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Recette d'origine</span>
+                        <a href="<?= htmlspecialchars($recipe['source_url']) ?>" target="_blank" rel="noopener noreferrer"
+                           class="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline break-all">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-xs shrink-0"></i>
+                            <?= htmlspecialchars($recipe['source_url']) ?>
+                        </a>
                     </div>
                 <?php endif; ?>
             </div>

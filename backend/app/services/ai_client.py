@@ -48,6 +48,8 @@ RECIPE_SYSTEM_PROMPT = (
     "- recipeCuisine: origine géographique\n"
     "- recipeIngredient: tableau de chaînes avec quantités et ingrédients\n"
     "- recipeInstructions: tableau d'objets HowToStep avec propriété 'text'\n"
+    "IMPORTANT : n'invente JAMAIS prepTime, cookTime ou totalTime. Si ces durées ne sont pas explicitement indiquées "
+    "dans le contenu fourni, laisse le champ correspondant à null (ne mets aucune estimation ou valeur par défaut).\n"
     "Ne réponds QUE par le JSON brut, sans backticks markdown ni texte d'accompagnement."
 )
 
@@ -148,8 +150,8 @@ SOCIAL_SYSTEM_PROMPT = (
     "- recipeCuisine: origine géographique\n"
     "- recipeIngredient: tableau de chaînes avec quantités et ingrédients\n"
     "- recipeInstructions: tableau d'objets HowToStep avec propriété 'text'\n"
-    "Si certaines informations (temps, portions...) ne sont précisées ni dans la légende ni dans les images, fais une estimation raisonnable "
-    "à partir du contexte plutôt que de laisser le champ vide.\n"
+    "IMPORTANT : n'invente JAMAIS prepTime, cookTime ou totalTime. Si ces durées ne sont pas explicitement indiquées "
+    "dans la légende ou visibles sur les images, laisse le champ correspondant à null. Ne fais aucune estimation.\n"
     "Ne réponds QUE par le JSON brut, sans backticks markdown ni texte d'accompagnement."
 )
 
