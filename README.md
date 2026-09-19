@@ -1,5 +1,13 @@
 # Recifood 🍳 &mdash; Gestionnaire de Recettes (Standard Schema.org)
 
+
+
+
+https://github.com/user-attachments/assets/c8bef3dc-42b7-4bc5-bbc1-d45116b488c0
+
+
+
+
 **Recifood est un projet personnel en vibe coding (car j'avais la flemme, je code déjà assez au taff), car les solutions qui existent, ne me convenaient pas, mais l'inspiration vient clairement de [https://github.com/mealie-recipes/mealie/] et [https://github.com/GerardPolloRebozado/social-to-mealie]**
 
 Recifood est une application web complète de gestion de recettes culinaires, conforme au standard international **[schema.org/Recipe](https://schema.org/Recipe)**.
