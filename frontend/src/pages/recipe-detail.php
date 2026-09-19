@@ -197,6 +197,10 @@ require_once __DIR__ . '/../includes/header.php';
             $time_cells_count = ($has_prep_time ? 1 : 0) + ($has_cook_time ? 1 : 0) + ($has_total_time ? 1 : 0);
             $total_cells = $time_cells_count + 1;
             $sm_cols_class = $total_cells >= 4 ? 'sm:grid-cols-4' : ($total_cells === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2');
+            // Sur mobile la grille reste fixée à 2 colonnes : si le nombre total de cases est impair,
+            // la dernière case (Portions) se retrouverait seule et décentrée à gauche. On la fait
+            // alors occuper toute la largeur (centrée) sur mobile, et revenir à une colonne normale dès le breakpoint sm.
+            $portions_span_class = ($total_cells % 2 !== 0) ? 'col-span-2 sm:col-span-1' : '';
             $cell_idx = 0;
         ?>
         <div class="grid grid-cols-2 <?= $sm_cols_class ?> gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-200/80 text-center">
@@ -228,7 +232,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <?php endif; ?>
             <?php $cell_idx++; ?>
-            <div class="p-2 <?= $cell_idx > 1 ? 'border-t sm:border-t-0 border-l border-slate-200/60' : '' ?>">
+            <div class="p-2 <?= $portions_span_class ?> <?= $cell_idx > 1 ? 'border-t sm:border-t-0 ' . ($portions_span_class ? 'sm:border-l' : 'border-l sm:border-l') . ' border-slate-200/60' : '' ?>">
                 <span class="block text-xs uppercase font-semibold text-slate-400 tracking-wider">Portions</span>
                 <?php if ($yield_number): ?>
                     <div class="flex items-center justify-center gap-2 mt-1">

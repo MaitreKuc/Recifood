@@ -44,9 +44,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         <i class="fa-solid fa-gear text-lg"></i>
                     </a>
 
-                    <div class="h-6 w-px bg-slate-200"></div>
+                    <div class="h-6 w-px bg-slate-200 hidden sm:block"></div>
 
-                    <div class="flex items-center space-x-3">
+                    <div class="hidden sm:flex items-center space-x-3">
                         <div class="flex items-center space-x-2">
                             <div class="w-8 h-8 rounded-full bg-brand-100 text-brand-700 font-semibold text-xs flex items-center justify-center border border-brand-200 uppercase">
                                 <?= strtoupper(substr(getCurrentUsername(), 0, 2)) ?>
@@ -60,14 +60,75 @@ $current_page = basename($_SERVER['PHP_SELF']);
                         </a>
                     </div>
                 <?php else: ?>
-                    <a href="/auth/login.php" class="text-sm font-medium text-slate-700 hover:text-brand-600 px-3 py-2">
+                    <a href="/auth/login.php" class="text-sm font-medium text-slate-700 hover:text-brand-600 px-3 py-2 hidden sm:inline-block">
                         Connexion
                     </a>
-                    <a href="/auth/register.php" class="text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 px-4 py-2 rounded-lg shadow-sm transition-colors">
+                    <a href="/auth/register.php" class="text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 px-4 py-2 rounded-lg shadow-sm transition-colors hidden sm:inline-block">
                         Créer un compte
                     </a>
                 <?php endif; ?>
+
+                <!-- Bouton menu mobile (hamburger) -->
+                <button type="button" id="mobile-menu-toggle" aria-label="Ouvrir le menu" aria-expanded="false"
+                        class="md:hidden p-2.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+                    <i class="fa-solid fa-bars text-lg" id="mobile-menu-icon-open"></i>
+                    <i class="fa-solid fa-xmark text-lg hidden" id="mobile-menu-icon-close"></i>
+                </button>
             </div>
         </div>
+
+        <!-- Menu mobile déroulant -->
+        <nav id="mobile-menu" class="hidden md:hidden pb-4 space-y-1 border-t border-slate-100 pt-3">
+            <a href="/pages/dashboard.php" class="block px-3.5 py-2.5 rounded-lg text-sm font-medium <?= ($current_page === 'dashboard.php' || $current_page === 'recipe-detail.php') ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-slate-600 hover:bg-slate-100' ?>">
+                <i class="fa-solid fa-book-open mr-2 text-xs w-4 inline-block"></i> Recettes
+            </a>
+            <?php if (isLoggedIn()): ?>
+            <a href="/pages/import.php" class="block px-3.5 py-2.5 rounded-lg text-sm font-medium <?= ($current_page === 'import.php') ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-slate-600 hover:bg-slate-100' ?>">
+                <i class="fa-solid fa-cloud-arrow-down mr-2 text-xs w-4 inline-block"></i> Importer
+            </a>
+            <a href="/pages/recipe-new.php" class="block px-3.5 py-2.5 rounded-lg text-sm font-medium <?= ($current_page === 'recipe-new.php') ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-slate-600 hover:bg-slate-100' ?>">
+                <i class="fa-solid fa-plus-circle mr-2 text-xs w-4 inline-block"></i> Nouvelle Recette
+            </a>
+            <a href="/pages/ai-imagine.php" class="block px-3.5 py-2.5 rounded-lg text-sm font-medium <?= ($current_page === 'ai-imagine.php') ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-slate-600 hover:bg-slate-100' ?>">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2 text-xs w-4 inline-block"></i> IA — Imagine
+            </a>
+            <a href="/pages/settings.php" class="block px-3.5 py-2.5 rounded-lg text-sm font-medium <?= ($current_page === 'settings.php') ? 'bg-brand-50 text-brand-600 font-semibold' : 'text-slate-600 hover:bg-slate-100' ?>">
+                <i class="fa-solid fa-gear mr-2 text-xs w-4 inline-block"></i> Paramètres
+            </a>
+            <div class="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between px-3.5">
+                <span class="text-sm font-medium text-slate-700 flex items-center gap-2">
+                    <span class="w-7 h-7 rounded-full bg-brand-100 text-brand-700 font-semibold text-xs flex items-center justify-center border border-brand-200 uppercase"><?= strtoupper(substr(getCurrentUsername(), 0, 2)) ?></span>
+                    <?= htmlspecialchars(getCurrentUsername()) ?>
+                </span>
+                <a href="/auth/logout.php" class="text-xs px-3 py-1.5 rounded-lg text-red-600 hover:bg-red-50 border border-red-200 font-medium transition-colors">
+                    <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Quitter
+                </a>
+            </div>
+            <?php else: ?>
+            <a href="/auth/login.php" class="block px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">
+                Connexion
+            </a>
+            <a href="/auth/register.php" class="block px-3.5 py-2.5 rounded-lg text-sm font-medium text-white bg-brand-500 hover:bg-brand-600 text-center">
+                Créer un compte
+            </a>
+            <?php endif; ?>
+        </nav>
     </div>
 </header>
+
+<script>
+(function () {
+    const toggleBtn = document.getElementById('mobile-menu-toggle');
+    const menu = document.getElementById('mobile-menu');
+    const iconOpen = document.getElementById('mobile-menu-icon-open');
+    const iconClose = document.getElementById('mobile-menu-icon-close');
+    if (!toggleBtn || !menu) return;
+
+    toggleBtn.addEventListener('click', function () {
+        const isHidden = menu.classList.toggle('hidden');
+        toggleBtn.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
+        iconOpen.classList.toggle('hidden', !isHidden);
+        iconClose.classList.toggle('hidden', isHidden);
+    });
+})();
+</script>

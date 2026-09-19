@@ -115,9 +115,12 @@ require_once __DIR__ . '/../includes/navbar.php';
             </p>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
             <a href="/pages/import.php" class="inline-flex items-center px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 shadow-sm transition">
                 <i class="fa-solid fa-cloud-arrow-down text-brand-500 mr-2"></i> Importer
+            </a>
+            <a href="/pages/ai-imagine.php" class="inline-flex items-center px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 shadow-sm transition">
+                <i class="fa-solid fa-wand-magic-sparkles text-brand-500 mr-2"></i> IA — Imagine
             </a>
             <a href="/pages/recipe-new.php" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-white text-sm font-semibold shadow-md hover:shadow-lg transition">
                 <i class="fa-solid fa-plus mr-2"></i> Nouvelle Recette
