@@ -27,7 +27,7 @@ def _get_client(api_url: str, api_key: str):
     )
 
 
-def clean_json_response(raw: str) -> Dict[str, Any]:
+def clean_json_response(raw: str) -> Any:
     cleaned = re.sub(r'^```json\s*|^```\s*|\s*```$', '', raw.strip(), flags=re.MULTILINE).strip()
     return json.loads(cleaned)
 
@@ -35,6 +35,8 @@ def clean_json_response(raw: str) -> Dict[str, Any]:
 RECIPE_SYSTEM_PROMPT = (
     "Tu es un expert culinaire et structurateur de données Schema.org. "
     "À partir du contenu fourni par l'utilisateur, génère un JSON STRICTEMENT conforme au standard schema.org/Recipe.\n"
+    "RÈGLE PRIORITAIRE : traduis et rédige TOUJOURS toute la recette en français, quelle que soit la langue de la source. "
+    "Le titre, la description, les ingrédients, les étapes, la catégorie et tous les textes destinés à l'utilisateur doivent être en français.\n"
     "Champs requis dans le JSON :\n"
     "- @context: 'https://schema.org'\n"
     "- @type: 'Recipe'\n"
@@ -135,9 +137,13 @@ SOCIAL_SYSTEM_PROMPT = (
     "(Instagram, TikTok, Facebook, Threads, Pinterest...). Une recette peut être décrite dans la légende (caption) du post, "
     "MAIS elle peut aussi être partiellement ou entièrement écrite/visible directement DANS les images/photos fournies "
     "(carrousel de photos, texte incrusté sur l'image, liste d'ingrédients ou étapes écrites à la main ou en légende sur la photo). "
-    "Analyse ATTENTIVEMENT la légende texte ET chaque image fournie, combine toutes les informations trouvées "
-    "(même réparties entre plusieurs images d'un carrousel), puis génère un JSON STRICTEMENT conforme au standard schema.org/Recipe.\n"
-    "Champs requis dans le JSON :\n"
+    "Analyse ATTENTIVEMENT la légende texte ET chaque image fournie. Un carrousel peut contenir une seule recette répartie "
+    "sur plusieurs images, OU plusieurs recettes distinctes (par exemple une recette par image). Identifie chaque recette complète "
+    "sans découper artificiellement une même recette, puis génère un objet JSON contenant une clé 'recipes' avec un tableau d'un "
+    "ou plusieurs objets STRICTEMENT conformes au standard schema.org/Recipe.\n"
+    "RÈGLE PRIORITAIRE : traduis et rédige TOUJOURS toutes les recettes en français, quelle que soit la langue de la légende ou des images. "
+    "Le titre, la description, les ingrédients, les étapes, la catégorie et tous les textes destinés à l'utilisateur doivent être en français.\n"
+    "Champs requis dans chaque recette du tableau :\n"
     "- @context: 'https://schema.org'\n"
     "- @type: 'Recipe'\n"
     "- name: titre de la recette\n"
@@ -150,13 +156,21 @@ SOCIAL_SYSTEM_PROMPT = (
     "- recipeCuisine: origine géographique\n"
     "- recipeIngredient: tableau de chaînes avec quantités et ingrédients\n"
     "- recipeInstructions: tableau d'objets HowToStep avec propriété 'text'\n"
+    "- sourceImageIndex: numéro (à partir de 1) de l'image représentant le mieux cette recette, uniquement si des images sont fournies\n"
     "IMPORTANT : n'invente JAMAIS prepTime, cookTime ou totalTime. Si ces durées ne sont pas explicitement indiquées "
     "dans la légende ou visibles sur les images, laisse le champ correspondant à null. Ne fais aucune estimation.\n"
+    "Format de réponse obligatoire : {\"recipes\": [{...}, {...}]}. "
     "Ne réponds QUE par le JSON brut, sans backticks markdown ni texte d'accompagnement."
 )
 
 
-def extract_recipe_from_social_post(caption_text: str, image_paths: List[str], api_url: str, api_key: str, model: str) -> Dict[str, Any]:
+def extract_recipe_from_social_post(
+    caption_text: str,
+    image_paths: List[str],
+    api_url: str,
+    api_key: str,
+    model: str,
+) -> List[Dict[str, Any]]:
     """
     Utilise le provider IA 'Vision' pour analyser conjointement la légende texte d'un post de réseau social
     et ses photos (carrousel inclus), la recette pouvant être répartie entre le texte et les images.
@@ -185,7 +199,20 @@ def extract_recipe_from_social_post(caption_text: str, image_paths: List[str], a
         temperature=0.2,
     )
     raw_content = res.choices[0].message.content
-    return clean_json_response(raw_content)
+    parsed = clean_json_response(raw_content)
+    if isinstance(parsed, dict) and isinstance(parsed.get("recipes"), list):
+        recipes = parsed["recipes"]
+    elif isinstance(parsed, list):
+        recipes = parsed
+    elif isinstance(parsed, dict):
+        recipes = [parsed]
+    else:
+        raise ValueError("La réponse IA ne contient aucune recette exploitable.")
+
+    valid_recipes = [recipe for recipe in recipes if isinstance(recipe, dict) and recipe.get("name")]
+    if not valid_recipes:
+        raise ValueError("La réponse IA ne contient aucune recette nommée.")
+    return valid_recipes
 
 
 def transcribe_audio(audio_path: str, api_url: str, api_key: str, model: str) -> str:

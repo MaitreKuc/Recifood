@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth_check.php';
+require_once __DIR__ . '/../includes/source_url.php';
 
 header('Content-Type: application/json');
 
@@ -30,6 +31,16 @@ try {
         $url = trim($data['url'] ?? '');
         if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
             echo json_encode(['success' => false, 'error' => 'URL invalide']);
+            exit;
+        }
+
+        $source_url = normalizeSourceUrl($url);
+        if (findRecipeIdBySourceUrl($db, $source_url)) {
+            http_response_code(409);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Cette URL a déjà été importée. Les doublons de source ne sont pas autorisés.'
+            ]);
             exit;
         }
 

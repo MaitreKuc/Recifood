@@ -26,10 +26,10 @@ require_once __DIR__ . '/../includes/navbar.php';
 <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-8">
         <h1 class="text-3xl font-extrabold text-slate-900 font-['Plus_Jakarta_Sans']">
-            Importer une Recette
+            Importer une ou plusieurs recettes
         </h1>
         <p class="text-sm text-slate-500 mt-1">
-            Convertissez et enregistrez n'importe quelle recette au standard officiel <a href="https://schema.org/Recipe" target="_blank" class="text-brand-600 font-semibold underline">schema.org/Recipe</a>.
+            Convertissez et enregistrez vos recettes au standard officiel <a href="https://schema.org/Recipe" target="_blank" class="text-brand-600 font-semibold underline">schema.org/Recipe</a>.
         </p>
     </div>
 
@@ -111,7 +111,7 @@ require_once __DIR__ . '/../includes/navbar.php';
                     <button type="submit" id="btn-import-site"
                             class="px-6 py-3 bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2">
                         <i class="fa-solid fa-download text-sm"></i>
-                        <span>Analyser & Importer la recette</span>
+                        <span>Analyser & Importer</span>
                     </button>
                 </form>
             </div>
@@ -216,7 +216,7 @@ require_once __DIR__ . '/../includes/navbar.php';
         <div class="flex items-center justify-between pb-4 border-b border-slate-100">
             <h3 class="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <i class="fa-solid fa-circle-check text-emerald-500"></i>
-                <span>Recette extraite avec succès</span>
+                <span id="preview-title">Recette extraite avec succès</span>
             </h3>
             <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-full">
                 schema.org/Recipe validé
@@ -231,14 +231,14 @@ require_once __DIR__ . '/../includes/navbar.php';
             <button onclick="saveExtractedRecipe()" id="btn-save-extracted"
                     class="px-6 py-3 bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2">
                 <i class="fa-solid fa-bookmark"></i>
-                <span>Confirmer et Ajouter à mes recettes</span>
+                <span id="save-extracted-label">Confirmer et Ajouter à mes recettes</span>
             </button>
         </div>
     </div>
 </main>
 
 <script>
-let extractedRecipeData = null;
+let extractedRecipeData = [];
 
 function switchTab(tabId) {
     // Boutons
@@ -296,9 +296,13 @@ async function handleSiteImport(e) {
             body: JSON.stringify({ action: 'site_auto', url: url })
         });
         const data = await res.json();
-        if (data.success && data.recipe) {
-            renderPreview(data.recipe);
-            const label = sourceLabels[data.detected_source] || 'Recette extraite avec succès !';
+        if (data.success && (data.recipes || data.recipe)) {
+            const recipes = data.recipes || [data.recipe];
+            renderPreview(recipes);
+            const count = recipes.length;
+            const label = count > 1
+                ? `${count} recettes distinctes extraites avec succès depuis ce carrousel !`
+                : (sourceLabels[data.detected_source] || 'Recette extraite avec succès !');
             showStatus('success', label);
         } else {
             showStatus('error', data.error || 'Impossible d\'extraire une recette de cette adresse.');
@@ -384,25 +388,46 @@ async function handleFileImport(e) {
     }
 }
 
-function renderPreview(recipe) {
-    extractedRecipeData = recipe;
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function renderPreview(recipeOrRecipes) {
+    extractedRecipeData = Array.isArray(recipeOrRecipes) ? recipeOrRecipes : [recipeOrRecipes];
     const container = document.getElementById('preview-container');
     const content = document.getElementById('preview-content');
+    const previewTitle = document.getElementById('preview-title');
+    const saveLabel = document.getElementById('save-extracted-label');
 
-    const ingredients = recipe.recipeIngredient || [];
-    const instructions = recipe.recipeInstructions || [];
-    const image = Array.isArray(recipe.image) ? recipe.image[0] : (recipe.image || '');
+    previewTitle.textContent = extractedRecipeData.length > 1
+        ? `${extractedRecipeData.length} recettes extraites avec succès`
+        : 'Recette extraite avec succès';
+    saveLabel.textContent = extractedRecipeData.length > 1
+        ? `Confirmer et ajouter les ${extractedRecipeData.length} recettes`
+        : 'Confirmer et Ajouter à mes recettes';
 
-    let html = `
+    const html = extractedRecipeData.map((recipe, recipeIndex) => {
+        const ingredients = recipe.recipeIngredient || [];
+        const instructions = recipe.recipeInstructions || [];
+        const image = Array.isArray(recipe.image) ? recipe.image[0] : (recipe.image || '');
+
+        return `
+        <section class="${recipeIndex > 0 ? 'pt-6 border-t-2 border-slate-200' : ''} space-y-4">
+        ${extractedRecipeData.length > 1 ? `<div class="text-xs font-bold uppercase tracking-wider text-brand-600">Recette ${recipeIndex + 1}</div>` : ''}
         <div class="flex flex-col sm:flex-row gap-6 items-start">
-            ${image ? `<img src="${image}" class="w-full sm:w-48 h-36 object-cover rounded-xl border border-slate-200">` : ''}
+            ${image ? `<img src="${escapeHtml(image)}" alt="" class="w-full sm:w-48 h-36 object-cover rounded-xl border border-slate-200">` : ''}
             <div class="space-y-2 flex-1">
-                <h4 class="text-2xl font-bold text-slate-900">${recipe.name || 'Sans titre'}</h4>
-                <p class="text-sm text-slate-600">${recipe.description || ''}</p>
+                <h4 class="text-2xl font-bold text-slate-900">${escapeHtml(recipe.name || 'Sans titre')}</h4>
+                <p class="text-sm text-slate-600">${escapeHtml(recipe.description || '')}</p>
                 <div class="flex flex-wrap gap-2 pt-1 text-xs">
-                    ${recipe.recipeCategory ? `<span class="bg-brand-50 text-brand-700 px-2.5 py-1 rounded-md font-medium">${recipe.recipeCategory}</span>` : ''}
-                    ${recipe.recipeCuisine ? `<span class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md font-medium">${recipe.recipeCuisine}</span>` : ''}
-                    ${recipe.recipeYield ? `<span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">${recipe.recipeYield}</span>` : ''}
+                    ${recipe.recipeCategory ? `<span class="bg-brand-50 text-brand-700 px-2.5 py-1 rounded-md font-medium">${escapeHtml(recipe.recipeCategory)}</span>` : ''}
+                    ${recipe.recipeCuisine ? `<span class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md font-medium">${escapeHtml(recipe.recipeCuisine)}</span>` : ''}
+                    ${recipe.recipeYield ? `<span class="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-medium">${escapeHtml(recipe.recipeYield)}</span>` : ''}
                 </div>
             </div>
         </div>
@@ -411,7 +436,7 @@ function renderPreview(recipe) {
             <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <h5 class="font-bold text-slate-800 mb-2">Ingrédients (${ingredients.length}) :</h5>
                 <ul class="list-disc list-inside space-y-1 text-slate-700 text-xs">
-                    ${ingredients.slice(0, 8).map(i => `<li>${typeof i === 'object' ? (i.name || JSON.stringify(i)) : i}</li>`).join('')}
+                    ${ingredients.slice(0, 8).map(i => `<li>${escapeHtml(typeof i === 'object' ? (i.name || JSON.stringify(i)) : i)}</li>`).join('')}
                     ${ingredients.length > 8 ? `<li class="text-slate-400 italic">+ ${ingredients.length - 8} autres...</li>` : ''}
                 </ul>
             </div>
@@ -420,13 +445,15 @@ function renderPreview(recipe) {
                 <ol class="list-decimal list-inside space-y-1 text-slate-700 text-xs">
                     ${instructions.slice(0, 5).map(inst => {
                         const txt = typeof inst === 'object' ? (inst.text || inst.name || '') : inst;
-                        return `<li>${txt.substring(0, 80)}${txt.length > 80 ? '...' : ''}</li>`;
+                        return `<li>${escapeHtml(txt.substring(0, 80))}${txt.length > 80 ? '...' : ''}</li>`;
                     }).join('')}
                     ${instructions.length > 5 ? `<li class="text-slate-400 italic">+ ${instructions.length - 5} étapes suivantes...</li>` : ''}
                 </ol>
             </div>
         </div>
+        </section>
     `;
+    }).join('');
 
     content.innerHTML = html;
     container.classList.remove('hidden');
@@ -434,7 +461,7 @@ function renderPreview(recipe) {
 }
 
 async function saveExtractedRecipe() {
-    if (!extractedRecipeData) return;
+    if (!extractedRecipeData.length) return;
     const btn = document.getElementById('btn-save-extracted');
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enregistrement...';
@@ -443,11 +470,13 @@ async function saveExtractedRecipe() {
         const res = await fetch('/api/save-recipe.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recipe: extractedRecipeData })
+            body: JSON.stringify({ recipes: extractedRecipeData })
         });
         const data = await res.json();
         if (data.success && data.recipe_id) {
-            window.location.href = '/pages/recipe-detail.php?id=' + data.recipe_id;
+            window.location.href = data.recipe_count > 1
+                ? '/pages/dashboard.php?imported=' + data.recipe_count
+                : '/pages/recipe-detail.php?id=' + data.recipe_id;
         } else {
             alert('Erreur : ' + (data.error || 'Impossible d\'enregistrer'));
             btn.disabled = false;

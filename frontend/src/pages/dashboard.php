@@ -82,11 +82,16 @@ try {
         $sql .= " AND urs.already_cooked = TRUE";
     }
 
-    $sql .= " ORDER BY is_favorite DESC, r.created_at DESC";
+    $page_size = 12;
+    $sql .= " ORDER BY is_favorite DESC, r.created_at DESC LIMIT " . ($page_size + 1);
 
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $recipes = $stmt->fetchAll();
+    $has_more_recipes = count($recipes) > $page_size;
+    if ($has_more_recipes) {
+        array_pop($recipes);
+    }
 
 } catch (Exception $e) {
     $error_msg = $e->getMessage();
@@ -98,6 +103,14 @@ require_once __DIR__ . '/../includes/navbar.php';
 ?>
 
 <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <?php $imported_count = max(0, (int)($_GET['imported'] ?? 0)); ?>
+    <?php if ($imported_count > 1): ?>
+        <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-3">
+            <i class="fa-solid fa-circle-check"></i>
+            <span><strong><?= $imported_count ?> recettes</strong> ont été importées avec succès depuis le carrousel.</span>
+        </div>
+    <?php endif; ?>
+
     <!-- En-tête du Dashboard -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
@@ -228,7 +241,7 @@ require_once __DIR__ . '/../includes/navbar.php';
             </div>
         </div>
     <?php else: ?>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div id="recipes-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <?php foreach ($recipes as $recipe): 
                 $schema = json_decode($recipe['schema_data'], true) ?: [];
                 $ingredients_count = is_array($schema['recipeIngredient'] ?? null) ? count($schema['recipeIngredient']) : 0;
@@ -329,10 +342,86 @@ require_once __DIR__ . '/../includes/navbar.php';
                 </a>
             <?php endforeach; ?>
         </div>
+        <?php if ($has_more_recipes): ?>
+            <div id="recipes-lazy-loader"
+                 data-next-page="2"
+                 class="mt-8 flex items-center justify-center min-h-12 text-sm text-slate-500"
+                 aria-live="polite">
+                <i class="fa-solid fa-spinner fa-spin mr-2"></i>
+                Chargement des recettes suivantes...
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 </main>
 
 <script>
+const recipesLazyLoader = document.getElementById('recipes-lazy-loader');
+if (recipesLazyLoader) {
+    let loadingRecipes = false;
+    const lazyParams = new URLSearchParams(window.location.search);
+    lazyParams.delete('page');
+
+    const loadNextRecipes = async () => {
+        if (loadingRecipes || !document.body.contains(recipesLazyLoader)) return;
+        loadingRecipes = true;
+        const page = Number(recipesLazyLoader.dataset.nextPage || '2');
+        lazyParams.set('page', String(page));
+
+        try {
+            const response = await fetch('/api/load-recipes.php?' + lazyParams.toString(), {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'Impossible de charger les recettes suivantes.');
+            }
+
+            document.getElementById('recipes-grid').insertAdjacentHTML('beforeend', data.html);
+            recipesLazyLoader.dataset.nextPage = String(data.next_page);
+
+            if (!data.has_more) {
+                recipesObserver.disconnect();
+                window.removeEventListener('scroll', checkRecipesLoader);
+                recipesLazyLoader.remove();
+            }
+        } catch (error) {
+            recipesObserver.disconnect();
+            window.removeEventListener('scroll', checkRecipesLoader);
+            recipesLazyLoader.innerHTML = `
+                <button type="button" class="px-4 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-semibold">
+                    Réessayer le chargement
+                </button>`;
+            recipesLazyLoader.querySelector('button').addEventListener('click', () => {
+                recipesLazyLoader.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Chargement...';
+                loadingRecipes = false;
+                recipesObserver.observe(recipesLazyLoader);
+                window.addEventListener('scroll', checkRecipesLoader, { passive: true });
+                checkRecipesLoader();
+            }, { once: true });
+            return;
+        }
+
+        loadingRecipes = false;
+        checkRecipesLoader();
+    };
+
+    const checkRecipesLoader = () => {
+        if (recipesLazyLoader.getBoundingClientRect().top <= window.innerHeight + 400) {
+            loadNextRecipes();
+        }
+    };
+
+    const recipesObserver = new IntersectionObserver((entries) => {
+        if (entries.some(entry => entry.isIntersecting)) {
+            loadNextRecipes();
+        }
+    }, { rootMargin: '400px 0px' });
+
+    recipesObserver.observe(recipesLazyLoader);
+    window.addEventListener('scroll', checkRecipesLoader, { passive: true });
+    checkRecipesLoader();
+}
+
 async function toggleFavorite(recipeId, btn, event) {
     event.preventDefault();
     event.stopPropagation();

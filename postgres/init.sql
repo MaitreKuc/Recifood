@@ -37,6 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_recipes_user_id ON recipes(user_id);
 CREATE INDEX IF NOT EXISTS idx_recipes_category ON recipes(recipe_category);
 CREATE INDEX IF NOT EXISTS idx_recipes_cuisine ON recipes(recipe_cuisine);
 CREATE INDEX IF NOT EXISTS idx_recipes_schema_data ON recipes USING GIN (schema_data);
+CREATE INDEX IF NOT EXISTS idx_recipes_source_url ON recipes(source_url) WHERE source_url IS NOT NULL AND source_url <> '';
 
 -- Statut personnel par utilisateur (favori / déjà cuisiné) : indépendant du créateur de la recette,
 -- puisque les recettes sont désormais publiques et partagées entre tous les comptes.
@@ -78,5 +79,4 @@ CREATE TABLE IF NOT EXISTS user_settings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
 

@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth_check.php';
+require_once __DIR__ . '/../includes/source_url.php';
 
 header('Content-Type: application/json');
 
@@ -14,37 +15,52 @@ if (!isLoggedIn()) {
 
 $user_id = getCurrentUserId();
 $data = json_decode(file_get_contents('php://input'), true);
-$recipe = $data['recipe'] ?? null;
+$recipes = $data['recipes'] ?? null;
+if (!is_array($recipes)) {
+    $recipe = $data['recipe'] ?? null;
+    $recipes = $recipe ? [$recipe] : [];
+}
 
-if (!$recipe || empty($recipe['name'])) {
+if (!$recipes) {
     echo json_encode(['success' => false, 'error' => 'Données de recette incomplètes (nom requis)']);
     exit;
 }
 
-// Normalisation Schema.org
-$recipe['@context'] = $recipe['@context'] ?? 'https://schema.org';
-$recipe['@type'] = 'Recipe';
-
-// L'auteur de la recette est toujours l'utilisateur connecté qui effectue l'import/la création,
-// jamais l'auteur détecté par l'IA ou extrait de la source (site web, post de réseau social...).
-$recipe['author'] = [
-    '@type' => 'Person',
-    'name' => getCurrentUsername()
-];
-
-$name = $recipe['name'];
-$description = $recipe['description'] ?? '';
-$image_url = is_array($recipe['image'] ?? null) ? ($recipe['image'][0] ?? '') : ($recipe['image'] ?? '');
-$prep_time = $recipe['prepTime'] ?? '';
-$cook_time = $recipe['cookTime'] ?? '';
-$total_time = $recipe['totalTime'] ?? '';
-$recipe_yield = is_array($recipe['recipeYield'] ?? null) ? implode(', ', $recipe['recipeYield']) : ($recipe['recipeYield'] ?? '');
-$recipe_category = is_array($recipe['recipeCategory'] ?? null) ? implode(', ', $recipe['recipeCategory']) : ($recipe['recipeCategory'] ?? '');
-$recipe_cuisine = is_array($recipe['recipeCuisine'] ?? null) ? implode(', ', $recipe['recipeCuisine']) : ($recipe['recipeCuisine'] ?? '');
-$source_url = $recipe['url'] ?? ($recipe['mainEntityOfPage'] ?? '');
+foreach ($recipes as $recipe) {
+    if (!is_array($recipe) || empty($recipe['name'])) {
+        echo json_encode(['success' => false, 'error' => 'Chaque recette doit contenir un nom.']);
+        exit;
+    }
+}
 
 try {
     $db = getDB();
+    $db->beginTransaction();
+
+    $source_urls = [];
+    foreach ($recipes as $recipe) {
+        $source_url = normalizeSourceUrl($recipe['url'] ?? ($recipe['mainEntityOfPage'] ?? ''));
+        if ($source_url !== '') {
+            $source_urls[$source_url] = true;
+        }
+    }
+
+    foreach (array_keys($source_urls) as $source_url) {
+        // Verrou transactionnel PostgreSQL : deux imports simultanés de la même URL ne peuvent pas passer ensemble.
+        $lock = $db->prepare("SELECT pg_advisory_xact_lock(hashtext(:source))");
+        $lock->execute([':source' => $source_url]);
+
+        if (findRecipeIdBySourceUrl($db, $source_url)) {
+            $db->rollBack();
+            http_response_code(409);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Cette URL a déjà été importée. Les doublons de source ne sont pas autorisés.'
+            ]);
+            exit;
+        }
+    }
+
     $stmt = $db->prepare("
         INSERT INTO recipes (
             user_id, name, description, image_url, prep_time, cook_time, total_time,
@@ -54,26 +70,50 @@ try {
             :yield, :cat, :cui, FALSE, :source, :schema
         ) RETURNING id
     ");
-    $stmt->execute([
-        ':uid' => $user_id,
-        ':name' => $name,
-        ':desc' => $description,
-        ':img' => $image_url,
-        ':prep' => $prep_time,
-        ':cook' => $cook_time,
-        ':total' => $total_time,
-        ':yield' => $recipe_yield,
-        ':cat' => $recipe_category,
-        ':cui' => $recipe_cuisine,
-        ':source' => $source_url,
-        ':schema' => json_encode($recipe, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
-    ]);
-    $new_id = $stmt->fetchColumn();
+
+    $recipe_ids = [];
+    foreach ($recipes as $recipe) {
+        $recipe['@context'] = $recipe['@context'] ?? 'https://schema.org';
+        $recipe['@type'] = 'Recipe';
+        $recipe['author'] = [
+            '@type' => 'Person',
+            'name' => getCurrentUsername()
+        ];
+
+        $source_url = normalizeSourceUrl($recipe['url'] ?? ($recipe['mainEntityOfPage'] ?? ''));
+        if ($source_url !== '') {
+            $recipe['url'] = $source_url;
+        }
+
+        $stmt->execute([
+            ':uid' => $user_id,
+            ':name' => $recipe['name'],
+            ':desc' => $recipe['description'] ?? '',
+            ':img' => is_array($recipe['image'] ?? null) ? ($recipe['image'][0] ?? '') : ($recipe['image'] ?? ''),
+            ':prep' => $recipe['prepTime'] ?? '',
+            ':cook' => $recipe['cookTime'] ?? '',
+            ':total' => $recipe['totalTime'] ?? '',
+            ':yield' => is_array($recipe['recipeYield'] ?? null) ? implode(', ', $recipe['recipeYield']) : ($recipe['recipeYield'] ?? ''),
+            ':cat' => is_array($recipe['recipeCategory'] ?? null) ? implode(', ', $recipe['recipeCategory']) : ($recipe['recipeCategory'] ?? ''),
+            ':cui' => is_array($recipe['recipeCuisine'] ?? null) ? implode(', ', $recipe['recipeCuisine']) : ($recipe['recipeCuisine'] ?? ''),
+            ':source' => $source_url,
+            ':schema' => json_encode($recipe, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+        ]);
+        $recipe_ids[] = (int)$stmt->fetchColumn();
+    }
+
+    $db->commit();
 
     echo json_encode([
         'success' => true,
-        'recipe_id' => (int)$new_id
+        'recipe_id' => $recipe_ids[0],
+        'recipe_ids' => $recipe_ids,
+        'recipe_count' => count($recipe_ids)
     ]);
 } catch (Exception $e) {
+    if (isset($db) && $db->inTransaction()) {
+        $db->rollBack();
+    }
+    http_response_code(500);
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

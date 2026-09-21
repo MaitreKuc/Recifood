@@ -89,7 +89,8 @@ La base de données démarre entièrement vide, sans aucune recette d'exemple : 
    - Modification réservée au propriétaire de la recette ou à l'administrateur.
 
 5. **Page d'importation unifiée (`/pages/import.php`)** :
-   - **Site Web** : détection automatique en cascade à partir d'une simple adresse — balisage Schema.org/microdata en premier (Marmiton, 750g, Allrecipes, BBC Good Food, blogs...), puis vidéo via yt-dlp + transcription IA (YouTube, TikTok...), puis post de réseau social (Instagram, Facebook, Threads, Pinterest...) analysé par IA Texte + Vision sur la légende et les photos du carrousel — utile quand la recette n'est écrite que sur les images.
+   - **Site Web** : détection automatique en cascade à partir d'une simple adresse — balisage Schema.org/microdata en premier (Marmiton, 750g, Allrecipes, BBC Good Food, blogs...), puis vidéo via yt-dlp + transcription IA (YouTube, TikTok...), puis post de réseau social (Instagram, Facebook, Threads, Pinterest...) analysé par IA Texte + Vision sur la légende et les photos du carrousel. Les contenus extraits par IA sont traduits en français et un carrousel contenant plusieurs recettes peut les créer en une seule importation.
+   - Une URL déjà importée est refusée, y compris lorsqu'elle est soumise avec des paramètres de suivi différents (`utm_*`, `fbclid`, `stkn`, etc.).
    - **Texte Libre (IA)** : Structuration automatique d'un texte brut en recette Schema.org.
    - **JSON Schema.org Direct** : Import direct d'un objet JSON-LD existant avec prévisualisation.
    - **Image / PDF** : Analyse d'une photo, capture d'écran ou PDF via l'IA Vision, avec conservation de l'image importée comme vignette de la recette.

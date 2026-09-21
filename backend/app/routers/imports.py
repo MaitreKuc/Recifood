@@ -472,8 +472,9 @@ def import_from_social(req: SocialImportRequest):
                        "Le post est peut-être privé ou nécessite une connexion."
             )
 
-        # Limite raisonnable du nombre d'images envoyées à l'IA Vision (coût / temps de traitement)
-        candidate_image_urls = candidate_image_urls[:6]
+        # Limite raisonnable du nombre d'images envoyées à l'IA Vision (coût / temps de traitement).
+        # Huit images permettent de couvrir les carrousels contenant plusieurs recettes.
+        candidate_image_urls = candidate_image_urls[:8]
 
         # Téléchargement de l'audio + transcription si le post contient une vraie vidéo
         if has_real_video and trans_api_url and trans_model:
@@ -501,13 +502,13 @@ def import_from_social(req: SocialImportRequest):
             except Exception:
                 transcript_text = ""  # On continue avec légende/photos seulement
 
-        # Téléchargement local des photos du post (jusqu'à 4) pour analyse par l'IA Vision
+        # Téléchargement local des photos du post pour analyse par l'IA Vision
         image_paths: List[str] = []
         if vision_api_url and vision_model:
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             }
-            for idx, img_url in enumerate(candidate_image_urls[:4]):
+            for idx, img_url in enumerate(candidate_image_urls):
                 try:
                     r = requests.get(img_url, headers=headers, timeout=15)
                     r.raise_for_status()
@@ -523,9 +524,15 @@ def import_from_social(req: SocialImportRequest):
             caption_text += f"\n\nTranscription audio de la vidéo du post :\n{transcript_text}"
 
         if vision_api_url and vision_model and image_paths:
-            recipe_obj = extract_recipe_from_social_post(caption_text, image_paths, vision_api_url, vision_api_key, vision_model)
+            recipe_objects = extract_recipe_from_social_post(
+                caption_text,
+                image_paths,
+                vision_api_url,
+                vision_api_key,
+                vision_model,
+            )
         elif text_api_url and text_model:
-            recipe_obj = extract_recipe_from_text(caption_text, text_api_url, text_api_key, text_model)
+            recipe_objects = [extract_recipe_from_text(caption_text, text_api_url, text_api_key, text_model)]
         else:
             raise HTTPException(
                 status_code=400,
@@ -533,21 +540,33 @@ def import_from_social(req: SocialImportRequest):
                        "Configurez le provider 'Vision' dans les Paramètres pour analyser les recettes visibles sur les photos."
             )
 
-        recipe_obj = normalize_recipe_jsonld(recipe_obj)
+        recipes: List[Dict[str, Any]] = []
+        for recipe_obj in recipe_objects:
+            recipe_obj = normalize_recipe_jsonld(recipe_obj)
+            source_image_index = recipe_obj.pop("sourceImageIndex", None)
+            if not recipe_obj.get("image") and candidate_image_urls:
+                try:
+                    image_index = max(0, min(int(source_image_index or 1) - 1, len(candidate_image_urls) - 1))
+                except (TypeError, ValueError):
+                    image_index = 0
+                recipe_obj["image"] = [candidate_image_urls[image_index]]
 
-        if not recipe_obj.get("image") and candidate_image_urls:
-            recipe_obj["image"] = [candidate_image_urls[0]]
+            if has_real_video:
+                recipe_obj["video"] = {
+                    "@type": "VideoObject",
+                    "name": title,
+                    "embedUrl": url,
+                    "thumbnailUrl": candidate_image_urls[0] if candidate_image_urls else ""
+                }
+            recipe_obj["url"] = url
+            recipes.append(recipe_obj)
 
-        if has_real_video:
-            recipe_obj["video"] = {
-                "@type": "VideoObject",
-                "name": title,
-                "embedUrl": url,
-                "thumbnailUrl": candidate_image_urls[0] if candidate_image_urls else ""
-            }
-        recipe_obj["url"] = url
-
-        return {"success": True, "recipe": recipe_obj}
+        return {
+            "success": True,
+            "recipe": recipes[0],
+            "recipes": recipes,
+            "recipe_count": len(recipes),
+        }
 
     except HTTPException:
         raise
