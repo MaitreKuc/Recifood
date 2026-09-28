@@ -94,6 +94,7 @@ La base de données démarre entièrement vide, sans aucune recette d'exemple : 
    - **Texte Libre (IA)** : Structuration automatique d'un texte brut en recette Schema.org.
    - **JSON Schema.org Direct** : Import direct d'un objet JSON-LD existant avec prévisualisation.
    - **Image / PDF** : Analyse d'une photo, capture d'écran ou PDF via l'IA Vision, avec conservation de l'image importée comme vignette de la recette.
+   - **Miniatures stockées en local** : toute image distante (CDN Instagram/Facebook, sites de recettes...) est téléchargée dans `frontend/src/uploads/recipes/` au moment de l'enregistrement, puis servie depuis Recifood. Les liens signés des réseaux sociaux expirant au bout de quelques jours, cela évite les vignettes cassées. Cela s'applique aussi à la création et à la modification manuelles d'une recette.
 
 6. **IA — Imagine (`/pages/ai-imagine.php`)** :
    - Génère une recette originale au format Schema.org à partir d'une simple description libre, via le provider IA Texte configuré.
@@ -151,3 +152,19 @@ Les recettes sont stockées en colonnes relationnelles (pour indexation et filtr
   }
 }
 ```
+
+Le champ `image` contient des chemins locaux (`/uploads/recipes/...`) dès lors que l'image d'origine a pu être téléchargée.
+
+---
+
+## 🛠️ Maintenance
+
+### Rapatrier les miniatures distantes existantes
+
+Pour les recettes importées avant la mise en place du stockage local des images :
+
+```bash
+docker compose exec frontend php /var/www/html/tools/localize-recipe-images.php
+```
+
+Le script télécharge chaque image encore hébergée sur un serveur distant, met à jour `recipes.image_url` et `schema_data->image`, et signale les liens déjà expirés (qui restent alors inchangés).

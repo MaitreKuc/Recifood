@@ -1,1 +1,5 @@
 /.env
+
+# Miniatures de recettes téléchargées localement
+/frontend/src/uploads/*
+!/frontend/src/uploads/.gitkeep

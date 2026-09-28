@@ -5,6 +5,7 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth_check.php';
 require_once __DIR__ . '/../includes/source_url.php';
+require_once __DIR__ . '/../includes/image_store.php';
 
 header('Content-Type: application/json');
 
@@ -35,7 +36,6 @@ foreach ($recipes as $recipe) {
 
 try {
     $db = getDB();
-    $db->beginTransaction();
 
     $source_urls = [];
     foreach ($recipes as $recipe) {
@@ -45,6 +45,30 @@ try {
         }
     }
 
+    $rejectDuplicate = static function (): void {
+        http_response_code(409);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Cette URL a déjà été importée. Les doublons de source ne sont pas autorisés.'
+        ]);
+        exit;
+    };
+
+    // Pré-contrôle hors transaction : évite de télécharger les images d'un import déjà connu.
+    foreach (array_keys($source_urls) as $source_url) {
+        if (findRecipeIdBySourceUrl($db, $source_url)) {
+            $rejectDuplicate();
+        }
+    }
+
+    // Les miniatures sont copiées en local avant la transaction : les URL des CDN sociaux
+    // expirent au bout de quelques jours et casseraient l'affichage.
+    foreach ($recipes as $index => $recipe) {
+        $recipes[$index] = localizeRecipeImages($recipe);
+    }
+
+    $db->beginTransaction();
+
     foreach (array_keys($source_urls) as $source_url) {
         // Verrou transactionnel PostgreSQL : deux imports simultanés de la même URL ne peuvent pas passer ensemble.
         $lock = $db->prepare("SELECT pg_advisory_xact_lock(hashtext(:source))");
@@ -52,12 +76,7 @@ try {
 
         if (findRecipeIdBySourceUrl($db, $source_url)) {
             $db->rollBack();
-            http_response_code(409);
-            echo json_encode([
-                'success' => false,
-                'error' => 'Cette URL a déjà été importée. Les doublons de source ne sont pas autorisés.'
-            ]);
-            exit;
+            $rejectDuplicate();
         }
     }
 

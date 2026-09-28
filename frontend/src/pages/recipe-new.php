@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth_check.php';
+require_once __DIR__ . '/../includes/image_store.php';
 
 requireAuth();
 
@@ -14,7 +15,7 @@ $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $description = trim($_POST['description'] ?? '');
-    $image_url = trim($_POST['image_url'] ?? '');
+    $image_url = storeRecipeImageLocally(trim($_POST['image_url'] ?? ''));
     $prep_minutes = (int)($_POST['prep_minutes'] ?? 0);
     $cook_minutes = (int)($_POST['cook_minutes'] ?? 0);
     $recipe_yield = trim($_POST['recipe_yield'] ?? '4 personnes');
