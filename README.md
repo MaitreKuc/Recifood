@@ -94,7 +94,7 @@ La base de données démarre entièrement vide, sans aucune recette d'exemple : 
    - **Texte Libre (IA)** : Structuration automatique d'un texte brut en recette Schema.org.
    - **JSON Schema.org Direct** : Import direct d'un objet JSON-LD existant avec prévisualisation.
    - **Image / PDF** : Analyse d'une photo, capture d'écran ou PDF via l'IA Vision, avec conservation de l'image importée comme vignette de la recette.
-   - **Miniatures stockées en local** : toute image distante (CDN Instagram/Facebook, sites de recettes...) est téléchargée dans `frontend/src/uploads/recipes/` au moment de l'enregistrement, puis servie depuis Recifood. Les liens signés des réseaux sociaux expirant au bout de quelques jours, cela évite les vignettes cassées. Cela s'applique aussi à la création et à la modification manuelles d'une recette.
+   - **Miniatures stockées en local** : toute image distante (CDN Instagram/Facebook, sites de recettes...) est téléchargée dans `frontend/src/uploads/recipes/` au moment de l'enregistrement, puis servie depuis Recifood. Les liens signés des réseaux sociaux expirant au bout de quelques jours, cela évite les vignettes cassées. Si l'adresse directe de l'image a déjà expiré, l'URL d'origine de la recette est réinterrogée pour en obtenir une nouvelle. Cela s'applique aussi à la création et à la modification manuelles d'une recette.
 
 6. **IA — Imagine (`/pages/ai-imagine.php`)** :
    - Génère une recette originale au format Schema.org à partir d'une simple description libre, via le provider IA Texte configuré.
@@ -167,4 +167,12 @@ Pour les recettes importées avant la mise en place du stockage local des images
 docker compose exec frontend php /var/www/html/tools/localize-recipe-images.php
 ```
 
-Le script télécharge chaque image encore hébergée sur un serveur distant, met à jour `recipes.image_url` et `schema_data->image`, et signale les liens déjà expirés (qui restent alors inchangés).
+Le script télécharge chaque image encore hébergée sur un serveur distant, met à jour `recipes.image_url` et `schema_data->image`.
+
+Si le lien direct de l'image a déjà expiré (erreur HTTP 403 des CDN Instagram/Facebook), le script repart automatiquement de l'**URL d'origine de la recette** pour récupérer une adresse d'image fraîchement signée (balises `og:image` / `twitter:image` de la page). Seules les recettes dont ni le lien direct ni la page d'origine ne répondent sont signalées comme irrécupérables.
+
+Les images sont téléchargées dès l'importation ; ce script n'est utile que pour les recettes antérieures. En cas de vignette manquante sur un import récent, la raison est tracée dans les logs :
+
+```bash
+docker compose logs frontend | grep '\[recifood\]\[image\]'
+```

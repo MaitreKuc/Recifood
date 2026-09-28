@@ -62,9 +62,14 @@ try {
     }
 
     // Les miniatures sont copiées en local avant la transaction : les URL des CDN sociaux
-    // expirent au bout de quelques jours et casseraient l'affichage.
+    // expirent au bout de quelques jours et casseraient l'affichage. Le téléchargement de
+    // plusieurs images peut dépasser le max_execution_time par défaut (30 s).
+    @set_time_limit(180);
     foreach ($recipes as $index => $recipe) {
-        $recipes[$index] = localizeRecipeImages($recipe);
+        $recipes[$index] = localizeRecipeImages(
+            $recipe,
+            normalizeSourceUrl($recipe['url'] ?? ($recipe['mainEntityOfPage'] ?? ''))
+        );
     }
 
     $db->beginTransaction();
